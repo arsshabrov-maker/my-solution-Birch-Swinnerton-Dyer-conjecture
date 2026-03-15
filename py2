@@ -1,0 +1,54 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+class MyCustomFormulaNet(nn.Module):
+    def __init__(self, n_in, n_h1, n_h2, n_out):
+        super().__init__()
+        # Веса связей между слоями
+        self.w1 = nn.Parameter(torch.randn(n_in, n_h1) * 0.2)
+        self.w2 = nn.Parameter(torch.randn(n_h1, n_h2) * 0.2)
+        self.w_out = nn.Parameter(torch.randn(n_h2, n_out) * 0.2)
+
+        # ТВОИ ПАРАМЕТРЫ ВНУТРИ ФОРМУЛЫ (w и b для каждого нейрона)
+        self.v1 = nn.Parameter(torch.randn(n_h1) * 0.1) # это 'вес' из формулы для слоя 1
+        self.b1 = nn.Parameter(torch.zeros(n_h1))      # это 'b' из формулы для слоя 1
+
+        self.v2 = nn.Parameter(torch.randn(n_h2) * 0.1) # это 'вес' из формулы для слоя 2
+        self.b2 = nn.Parameter(torch.zeros(n_h2))      # это 'b' из формулы для слоя 2
+
+    def forward(self, x):
+        # --- СЛОЙ 1 ---
+        z1 = x @ self.w1
+        # ТВОЯ ФОРМУЛА: z^3 + v*z + b
+        # Используем tanh, чтобы куб не улетел в бесконечность
+        h1 = torch.tanh(torch.pow(z1, 3) + z1 * self.v1 + self.b1)
+
+        # --- СЛОЙ 2 ---
+        z2 = h1 @ self.w2
+        # Снова твоя формула
+        h2 = torch.tanh(torch.pow(z2, 3) + z2 * self.v2 + self.b2)
+
+        # ВЫХОД
+        return h2 @ self.w_out
+
+# ПАРАМЕТРЫ И ОБУЧЕНИЕ
+N = 100
+custom_model = MyCustomFormulaNet(1, N, N, 1)
+base_model = nn.Sequential(nn.Linear(1, N), nn.ReLU(), nn.Linear(N, N), nn.ReLU(), nn.Linear(N, 1))
+
+x = torch.linspace(-3, 3, 300).view(-1, 1)
+y = torch.sin(x**2)
+
+def train(m, name):
+    optimizer = optim.Adam(m.parameters(), lr=0.005)
+    crit = nn.MSELoss()
+    for i in range(2001):
+        optimizer.zero_grad()
+        loss = crit(m(x), y)
+        loss.backward()
+        optimizer.step()
+    print(f"{name} | Финальный Loss: {loss.item():.8f}")
+
+train(custom_model, "Твоя (z^3 + wz + b)")
+train(base_model, "База (ReLU)")
